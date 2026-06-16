@@ -3,6 +3,8 @@ import { App } from './app';
 
 describe('App', () => {
   beforeEach(async () => {
+    spyOn(window, 'fetch').and.returnValue(Promise.resolve({ ok: false } as Response));
+
     await TestBed.configureTestingModule({
       imports: [App],
     }).compileComponents();
@@ -14,10 +16,11 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render title', () => {
+  it('should render the quiz heading and product choices', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, qms-no-cost-quiz-angular');
+    expect(compiled.querySelector('h1')?.textContent).toContain("Let's get your order started!");
+    expect(compiled.querySelectorAll('.product-card').length).toBe(4);
   });
 });
