@@ -121,6 +121,8 @@
       class="quCard shadow-sm rounded-lg step2-two"
       *ngIf="hasCompressionSelected"
       [class.disabled]="hasCgmSelected && !prescribedCgmBefore"
+      [attr.inert]="hasCgmSelected && !prescribedCgmBefore ? '' : null"
+      [attr.aria-disabled]="hasCgmSelected && !prescribedCgmBefore"
       data-locked-message="Complete CGM questions to continue."
       (click)="hasCgmSelected && !prescribedCgmBefore ? showBlockingStepErrors() : null"
     >
@@ -134,6 +136,8 @@
               type="radio"
               name="lymphedema"
               [value]="option"
+              [disabled]="hasCgmSelected && !prescribedCgmBefore"
+              [attr.disabled]="hasCgmSelected && !prescribedCgmBefore ? '' : null"
               [(ngModel)]="lymphedema"
               (ngModelChange)="onCompressionChange('lymphedema', option)"
             />
@@ -150,6 +154,8 @@
               type="radio"
               name="garmentType"
               [value]="option"
+              [disabled]="hasCgmSelected && !prescribedCgmBefore"
+              [attr.disabled]="hasCgmSelected && !prescribedCgmBefore ? '' : null"
               [(ngModel)]="garmentType"
               (ngModelChange)="onCompressionChange('garmentType', option)"
             />
@@ -162,7 +168,9 @@
     <section
       class="quCard shadow-sm rounded-lg step3"
       [class.disabled]="!personalUnlocked"
-      data-locked-message="Select at least one product to continue."
+      [attr.inert]="!personalUnlocked ? '' : null"
+      [attr.aria-disabled]="!personalUnlocked"
+      [attr.data-locked-message]="personalLockedMessage"
       (click)="!personalUnlocked ? showBlockingStepErrors() : null"
     >
       <div class="quCard_title"><span class="count">{{ stepNumber('personal') }}</span> Your Personal Information</div>
@@ -178,6 +186,10 @@
                 name="firstName"
                 placeholder="First Name"
                 autocomplete="given-name"
+                required
+                [disabled]="!personalUnlocked"
+                [attr.disabled]="!personalUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['firstName'] ? 'true' : null"
                 [(ngModel)]="personal.firstName"
                 (input)="onPersonalInput('firstName')"
               />
@@ -194,6 +206,10 @@
                 name="lastName"
                 placeholder="Last Name"
                 autocomplete="family-name"
+                required
+                [disabled]="!personalUnlocked"
+                [attr.disabled]="!personalUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['lastName'] ? 'true' : null"
                 [(ngModel)]="personal.lastName"
                 (input)="onPersonalInput('lastName')"
               />
@@ -212,6 +228,11 @@
                 autocomplete="bday"
                 inputmode="numeric"
                 maxlength="10"
+                required
+                pattern="\d{1,2}/\d{1,2}/\d{4}"
+                [disabled]="!personalUnlocked"
+                [attr.disabled]="!personalUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['dob'] ? 'true' : null"
                 [(ngModel)]="personal.dob"
                 (input)="onPersonalInput('dob')"
               />
@@ -228,6 +249,11 @@
                 name="email"
                 placeholder="Email Address"
                 autocomplete="email"
+                required
+                email
+                [disabled]="!personalUnlocked"
+                [attr.disabled]="!personalUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['email'] ? 'true' : null"
                 [(ngModel)]="personal.email"
                 (input)="onPersonalInput('email')"
               />
@@ -246,6 +272,10 @@
                 autocomplete="tel"
                 inputmode="tel"
                 maxlength="14"
+                required
+                [disabled]="!personalUnlocked"
+                [attr.disabled]="!personalUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['phone'] ? 'true' : null"
                 [(ngModel)]="personal.phone"
                 (input)="onPersonalInput('phone')"
               />
@@ -262,6 +292,10 @@
                     type="radio"
                     name="gender"
                     value="male"
+                    required
+                    [disabled]="!personalUnlocked"
+                    [attr.disabled]="!personalUnlocked ? '' : null"
+                    [attr.aria-invalid]="errors['gender'] ? 'true' : null"
                     [(ngModel)]="personal.gender"
                     (ngModelChange)="onPersonalInput('gender')"
                   />
@@ -273,6 +307,10 @@
                     type="radio"
                     name="gender"
                     value="female"
+                    required
+                    [disabled]="!personalUnlocked"
+                    [attr.disabled]="!personalUnlocked ? '' : null"
+                    [attr.aria-invalid]="errors['gender'] ? 'true' : null"
                     [(ngModel)]="personal.gender"
                     (ngModelChange)="onPersonalInput('gender')"
                   />
@@ -289,7 +327,9 @@
     <section
       class="quCard shadow-sm rounded-lg step4"
       [class.disabled]="!shippingUnlocked"
-      data-locked-message="Complete personal information to continue."
+      [attr.inert]="!shippingUnlocked ? '' : null"
+      [attr.aria-disabled]="!shippingUnlocked"
+      [attr.data-locked-message]="shippingLockedMessage"
       (click)="!shippingUnlocked ? showBlockingStepErrors() : null"
     >
       <div class="quCard_title"><span class="count">{{ stepNumber('shipping') }}</span> Your Shipping Information</div>
@@ -306,9 +346,15 @@
                 id="address1"
                 placeholder="Enter Address 1"
                 autocomplete="address-line1"
+                role="combobox"
                 aria-autocomplete="list"
                 [attr.aria-expanded]="addressSuggestions.length > 0"
                 aria-controls="addressSuggestions"
+                [attr.aria-activedescendant]="activeAddressSuggestionId"
+                required
+                [disabled]="!shippingUnlocked"
+                [attr.disabled]="!shippingUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['address1'] ? 'true' : null"
                 [(ngModel)]="shipping.address1"
                 (input)="onShippingInput('address1')"
                 (keydown)="handleAddressKeydown($event)"
@@ -319,8 +365,10 @@
                   type="button"
                   class="address-suggestion"
                   *ngFor="let suggestion of addressSuggestions; let index = index"
+                  [id]="'addressSuggestion-' + index"
                   [class.is-active]="index === activeAddressSuggestionIndex"
                   role="option"
+                  [attr.aria-selected]="index === activeAddressSuggestionIndex"
                   (click)="applyAddressSuggestion(suggestion)"
                 >
                   {{ formatAddressSuggestion(suggestion) }}
@@ -337,6 +385,8 @@
                 name="address2"
                 placeholder="Enter Address 2"
                 autocomplete="address-line2"
+                [disabled]="!shippingUnlocked"
+                [attr.disabled]="!shippingUnlocked ? '' : null"
                 [(ngModel)]="shipping.address2"
                 (input)="onShippingInput('address2')"
               />
@@ -352,6 +402,10 @@
                 name="city"
                 placeholder="Enter City"
                 autocomplete="address-level2"
+                required
+                [disabled]="!shippingUnlocked"
+                [attr.disabled]="!shippingUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['city'] ? 'true' : null"
                 [(ngModel)]="shipping.city"
                 (input)="onShippingInput('city')"
               />
@@ -361,16 +415,23 @@
           <div class="col-md-4">
             <label class="form-group mb-3">
               <span>State</span>
-              <input
-                type="text"
+              <select
                 class="form-control w-100"
                 [class.is-invalid]="errors['state']"
                 name="state"
-                placeholder="Enter State"
                 autocomplete="address-level1"
+                required
+                [disabled]="!shippingUnlocked"
+                [attr.disabled]="!shippingUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['state'] ? 'true' : null"
                 [(ngModel)]="shipping.state"
-                (input)="onShippingInput('state')"
-              />
+                (ngModelChange)="onShippingInput('state')"
+              >
+                <option value="">Select State</option>
+                <option *ngFor="let state of stateOptions" [value]="state.code">
+                  {{ state.code }} - {{ state.name }}
+                </option>
+              </select>
               <span class="field-error" *ngIf="errors['state']">{{ errors['state'] }}</span>
             </label>
           </div>
@@ -384,6 +445,13 @@
                 name="zipcode"
                 placeholder="Enter Zip Code"
                 autocomplete="postal-code"
+                inputmode="numeric"
+                maxlength="10"
+                pattern="\d{5}(-\d{4})?"
+                required
+                [disabled]="!shippingUnlocked"
+                [attr.disabled]="!shippingUnlocked ? '' : null"
+                [attr.aria-invalid]="errors['zipcode'] ? 'true' : null"
                 [(ngModel)]="shipping.zipcode"
                 (input)="onShippingInput('zipcode')"
               />
@@ -397,7 +465,9 @@
     <section
       class="quCard shadow-sm rounded-lg step5"
       [class.disabled]="!healthUnlocked"
-      data-locked-message="Complete shipping information to continue."
+      [attr.inert]="!healthUnlocked ? '' : null"
+      [attr.aria-disabled]="!healthUnlocked"
+      [attr.data-locked-message]="healthLockedMessage"
       (click)="!healthUnlocked ? showBlockingStepErrors() : null"
     >
       <div class="quCard_title"><span class="count">{{ stepNumber('health') }}</span>Your Health History</div>
@@ -410,6 +480,10 @@
               type="radio"
               name="diabetes"
               value="type_1"
+              required
+              [disabled]="!healthUnlocked"
+              [attr.disabled]="!healthUnlocked ? '' : null"
+              [attr.aria-invalid]="errors['diabetes'] ? 'true' : null"
               [(ngModel)]="health.diabetes"
               (ngModelChange)="onHealthChange('diabetes', 'type_1')"
             />
@@ -421,6 +495,10 @@
               type="radio"
               name="diabetes"
               value="type_2"
+              required
+              [disabled]="!healthUnlocked"
+              [attr.disabled]="!healthUnlocked ? '' : null"
+              [attr.aria-invalid]="errors['diabetes'] ? 'true' : null"
               [(ngModel)]="health.diabetes"
               (ngModelChange)="onHealthChange('diabetes', 'type_2')"
             />
@@ -432,6 +510,10 @@
               type="radio"
               name="diabetes"
               value="not_diabetic"
+              required
+              [disabled]="!healthUnlocked"
+              [attr.disabled]="!healthUnlocked ? '' : null"
+              [attr.aria-invalid]="errors['diabetes'] ? 'true' : null"
               [(ngModel)]="health.diabetes"
               (ngModelChange)="onHealthChange('diabetes', 'not_diabetic')"
             />
@@ -440,7 +522,7 @@
         </div>
         <div class="field-error" *ngIf="errors['diabetes']">{{ errors['diabetes'] }}</div>
       </div>
-      <div class="question mt-4">
+      <div class="question mt-4" *ngIf="healthRequiresInsulin">
         <div class="question_title">Do you use Insulin (Inject Or Inhale) To Control Your Diabetes?</div>
         <div class="row gy-2 gy-md-0 radio-group" [class.is-invalid]="errors['insulin']">
           <label class="col-sm-4 col-xl-2 form-check">
@@ -449,6 +531,10 @@
               type="radio"
               name="insulin"
               value="yes"
+              required
+              [disabled]="!healthUnlocked"
+              [attr.disabled]="!healthUnlocked ? '' : null"
+              [attr.aria-invalid]="errors['insulin'] ? 'true' : null"
               [(ngModel)]="health.insulin"
               (ngModelChange)="onHealthChange('insulin', 'yes')"
             />
@@ -460,6 +546,10 @@
               type="radio"
               name="insulin"
               value="no"
+              required
+              [disabled]="!healthUnlocked"
+              [attr.disabled]="!healthUnlocked ? '' : null"
+              [attr.aria-invalid]="errors['insulin'] ? 'true' : null"
               [(ngModel)]="health.insulin"
               (ngModelChange)="onHealthChange('insulin', 'no')"
             />
@@ -473,7 +563,9 @@
     <section
       class="quCard shadow-sm rounded-lg step6"
       [class.disabled]="!acknowledgementUnlocked"
-      data-locked-message="Complete health history to continue."
+      [attr.inert]="!acknowledgementUnlocked ? '' : null"
+      [attr.aria-disabled]="!acknowledgementUnlocked"
+      [attr.data-locked-message]="acknowledgementLockedMessage"
       (click)="!acknowledgementUnlocked ? showBlockingStepErrors() : null"
     >
       <div class="quCard_title">Acknowledgement</div>

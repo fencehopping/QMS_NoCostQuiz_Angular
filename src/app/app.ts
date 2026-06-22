@@ -46,6 +46,11 @@ interface GooglePlace {
   reviews: GoogleReview[];
 }
 
+interface StateOption {
+  code: string;
+  name: string;
+}
+
 declare global {
   interface Window {
     dataLayer?: Record<string, unknown>[];
@@ -91,6 +96,62 @@ export class App implements OnInit {
       image: 'assets/images/shoe.png',
     },
   ];
+
+  readonly stateOptions: StateOption[] = [
+    { code: 'AL', name: 'Alabama' },
+    { code: 'AK', name: 'Alaska' },
+    { code: 'AZ', name: 'Arizona' },
+    { code: 'AR', name: 'Arkansas' },
+    { code: 'CA', name: 'California' },
+    { code: 'CO', name: 'Colorado' },
+    { code: 'CT', name: 'Connecticut' },
+    { code: 'DE', name: 'Delaware' },
+    { code: 'DC', name: 'District of Columbia' },
+    { code: 'FL', name: 'Florida' },
+    { code: 'GA', name: 'Georgia' },
+    { code: 'HI', name: 'Hawaii' },
+    { code: 'ID', name: 'Idaho' },
+    { code: 'IL', name: 'Illinois' },
+    { code: 'IN', name: 'Indiana' },
+    { code: 'IA', name: 'Iowa' },
+    { code: 'KS', name: 'Kansas' },
+    { code: 'KY', name: 'Kentucky' },
+    { code: 'LA', name: 'Louisiana' },
+    { code: 'ME', name: 'Maine' },
+    { code: 'MD', name: 'Maryland' },
+    { code: 'MA', name: 'Massachusetts' },
+    { code: 'MI', name: 'Michigan' },
+    { code: 'MN', name: 'Minnesota' },
+    { code: 'MS', name: 'Mississippi' },
+    { code: 'MO', name: 'Missouri' },
+    { code: 'MT', name: 'Montana' },
+    { code: 'NE', name: 'Nebraska' },
+    { code: 'NV', name: 'Nevada' },
+    { code: 'NH', name: 'New Hampshire' },
+    { code: 'NJ', name: 'New Jersey' },
+    { code: 'NM', name: 'New Mexico' },
+    { code: 'NY', name: 'New York' },
+    { code: 'NC', name: 'North Carolina' },
+    { code: 'ND', name: 'North Dakota' },
+    { code: 'OH', name: 'Ohio' },
+    { code: 'OK', name: 'Oklahoma' },
+    { code: 'OR', name: 'Oregon' },
+    { code: 'PA', name: 'Pennsylvania' },
+    { code: 'RI', name: 'Rhode Island' },
+    { code: 'SC', name: 'South Carolina' },
+    { code: 'SD', name: 'South Dakota' },
+    { code: 'TN', name: 'Tennessee' },
+    { code: 'TX', name: 'Texas' },
+    { code: 'UT', name: 'Utah' },
+    { code: 'VT', name: 'Vermont' },
+    { code: 'VA', name: 'Virginia' },
+    { code: 'WA', name: 'Washington' },
+    { code: 'WV', name: 'West Virginia' },
+    { code: 'WI', name: 'Wisconsin' },
+    { code: 'WY', name: 'Wyoming' },
+  ];
+
+  readonly stateCodes = new Set(this.stateOptions.map((option) => option.code));
 
   selectedProductIds = new Set<ProductId>();
   prescribedCgmBefore = '';
@@ -219,8 +280,52 @@ export class App implements OnInit {
     return this.acknowledgementUnlocked && this.acknowledgement;
   }
 
+  get healthRequiresInsulin(): boolean {
+    return Boolean(this.health.diabetes && this.health.diabetes !== 'not_diabetic');
+  }
+
   get addressReviewText(): string {
     return this.renderAddressForReview(this.shipping);
+  }
+
+  get activeAddressSuggestionId(): string | null {
+    return this.activeAddressSuggestionIndex >= 0
+      ? `addressSuggestion-${this.activeAddressSuggestionIndex}`
+      : null;
+  }
+
+  get personalLockedMessage(): string {
+    if (!this.hasCompletedProductStep()) {
+      return 'Select at least one product to continue.';
+    }
+    if (!this.hasCompletedCgmStep()) {
+      return 'Answer the CGM prescription question to continue.';
+    }
+    if (!this.hasCompletedCompressionStep()) {
+      return 'Complete the compression questions to continue.';
+    }
+    return 'Complete product questions to continue.';
+  }
+
+  get shippingLockedMessage(): string {
+    const missing = this.personalMissingFields();
+    return missing.length
+      ? `Complete personal information: ${missing.join(', ')}.`
+      : 'Complete personal information to continue.';
+  }
+
+  get healthLockedMessage(): string {
+    const missing = this.shippingMissingFields();
+    return missing.length
+      ? `Complete shipping information: ${missing.join(', ')}.`
+      : 'Complete shipping information to continue.';
+  }
+
+  get acknowledgementLockedMessage(): string {
+    const missing = this.healthMissingFields();
+    return missing.length
+      ? `Complete health history: ${missing.join(', ')}.`
+      : 'Complete health history to continue.';
   }
 
   stepNumber(step: 'cgm' | 'compression' | 'personal' | 'shipping' | 'health'): number {
@@ -299,6 +404,11 @@ export class App implements OnInit {
   }
 
   onCompressionChange(fieldName: 'lymphedema' | 'garmentType', value: string): void {
+    if (fieldName === 'lymphedema') {
+      this.lymphedema = value;
+    } else {
+      this.garmentType = value;
+    }
     this.trackEvent('branch_selected', {
       step_id: 'compression_questions',
       branch_name: fieldName === 'lymphedema' ? 'has_lymphedema' : 'compression_garment_type',
@@ -336,7 +446,7 @@ export class App implements OnInit {
       }
     }
 
-    this.validatePersonal(this.validationAttempts.personal);
+    this.validatePersonal(true);
     if (this.isPersonalValid()) {
       this.trackStepComplete('personal_information', {
         required_fields_completed: true,
@@ -346,8 +456,14 @@ export class App implements OnInit {
   }
 
   onShippingInput(field?: keyof AddressSnapshot): void {
+    if (field === 'state') {
+      this.shipping.state = this.shipping.state.toUpperCase();
+    }
+    if (field === 'address1') {
+      this.handleManualAddressOneEdit();
+    }
     this.watchSmartyAddressChanges();
-    this.validateShipping(this.validationAttempts.shipping);
+    this.validateShipping(true);
     if (field === 'address1') {
       window.clearTimeout(this.addressSuggestionTimer);
       this.addressSuggestionTimer = window.setTimeout(() => {
@@ -369,16 +485,21 @@ export class App implements OnInit {
   }
 
   onHealthChange(fieldName: 'diabetes' | 'insulin', value: string): void {
+    this.health[fieldName] = value;
+    if (fieldName === 'diabetes' && value === 'not_diabetic') {
+      this.health.insulin = '';
+      this.setError('insulin', '');
+    }
     this.trackEvent('branch_selected', {
       step_id: 'health_history',
       branch_name: fieldName === 'diabetes' ? 'diabetes_type' : 'uses_insulin',
       branch_value: value,
     });
-    this.validateHealth(this.validationAttempts.health);
+    this.validateHealth(true);
     if (this.isHealthValid()) {
       this.trackStepComplete('health_history', {
         diabetes_type: this.health.diabetes,
-        uses_insulin: this.health.insulin,
+        uses_insulin: this.healthRequiresInsulin ? this.health.insulin : 'not_applicable',
       });
     }
     this.trackVisibleStepViews();
@@ -500,7 +621,7 @@ export class App implements OnInit {
     this.shipping.address1 = suggestion.street_line || '';
     this.shipping.address2 = suggestion.secondary || '';
     this.shipping.city = suggestion.city || '';
-    this.shipping.state = suggestion.state || '';
+    this.shipping.state = (suggestion.state || '').toUpperCase();
     this.shipping.zipcode = suggestion.zipcode || '';
     this.selectedSmartyAddress = { ...this.shipping };
     this.smartyAddressAltered = false;
@@ -580,13 +701,13 @@ export class App implements OnInit {
     return Boolean(
       this.shipping.address1.trim() &&
         this.shipping.city.trim() &&
-        this.shipping.state.trim() &&
-        this.shipping.zipcode.trim(),
+        this.isValidState(this.shipping.state) &&
+        this.isValidZip(this.shipping.zipcode),
     );
   }
 
   private isHealthValid(): boolean {
-    return Boolean(this.health.diabetes && this.health.insulin);
+    return Boolean(this.health.diabetes && (!this.healthRequiresInsulin || this.health.insulin));
   }
 
   private validatePersonal(showErrors = false): boolean {
@@ -622,8 +743,22 @@ export class App implements OnInit {
     }
     this.setError('address1', this.shipping.address1.trim() ? '' : 'Address 1 is required.');
     this.setError('city', this.shipping.city.trim() ? '' : 'City is required.');
-    this.setError('state', this.shipping.state.trim() ? '' : 'State is required.');
-    this.setError('zipcode', this.shipping.zipcode.trim() ? '' : 'Zip code is required.');
+    this.setError(
+      'state',
+      !this.shipping.state.trim()
+        ? 'State is required.'
+        : this.isValidState(this.shipping.state)
+          ? ''
+          : 'Select a valid 2-letter state.',
+    );
+    this.setError(
+      'zipcode',
+      !this.shipping.zipcode.trim()
+        ? 'Zip code is required.'
+        : this.isValidZip(this.shipping.zipcode)
+          ? ''
+          : 'Enter a valid 5-digit ZIP code.',
+    );
     return this.isShippingValid();
   }
 
@@ -632,7 +767,7 @@ export class App implements OnInit {
       return this.isHealthValid();
     }
     this.setError('diabetes', this.health.diabetes ? '' : 'Diabetes type is required.');
-    this.setError('insulin', this.health.insulin ? '' : 'Insulin use is required.');
+    this.setError('insulin', !this.healthRequiresInsulin || this.health.insulin ? '' : 'Insulin use is required.');
     return this.isHealthValid();
   }
 
@@ -672,6 +807,14 @@ export class App implements OnInit {
     );
   }
 
+  private isValidState(value: string): boolean {
+    return this.stateCodes.has(value.trim().toUpperCase());
+  }
+
+  private isValidZip(value: string): boolean {
+    return /^\d{5}(?:-\d{4})?$/.test(value.trim());
+  }
+
   private formatDobInput(value: string): string {
     const digits = value.replace(/\D/g, '').slice(0, 8);
     const parts: string[] = [];
@@ -696,6 +839,48 @@ export class App implements OnInit {
       return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
     }
     return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  private handleManualAddressOneEdit(): void {
+    if (!this.selectedSmartyAddress || this.addressesMatch(this.shipping, this.selectedSmartyAddress)) {
+      return;
+    }
+    this.shipping.city = '';
+    this.shipping.state = '';
+    this.shipping.zipcode = '';
+    this.selectedSmartyAddress = null;
+    this.smartyAddressAltered = false;
+    this.smartyAddressConfirmed = false;
+    this.setError('city', 'City is required after changing Address 1.');
+    this.setError('state', 'State is required after changing Address 1.');
+    this.setError('zipcode', 'Zip code is required after changing Address 1.');
+  }
+
+  private personalMissingFields(): string[] {
+    const missing: string[] = [];
+    if (!this.personal.firstName.trim()) missing.push('first name');
+    if (!this.personal.lastName.trim()) missing.push('last name');
+    if (!this.personal.dob.trim() || !this.isValidDob(this.personal.dob)) missing.push('valid date of birth');
+    if (!this.personal.email.trim() || !this.isValidEmail(this.personal.email)) missing.push('valid email');
+    if (!this.personal.phone.trim()) missing.push('phone number');
+    if (!this.personal.gender) missing.push('gender');
+    return missing;
+  }
+
+  private shippingMissingFields(): string[] {
+    const missing: string[] = [];
+    if (!this.shipping.address1.trim()) missing.push('address 1');
+    if (!this.shipping.city.trim()) missing.push('city');
+    if (!this.shipping.state.trim() || !this.isValidState(this.shipping.state)) missing.push('valid state');
+    if (!this.shipping.zipcode.trim() || !this.isValidZip(this.shipping.zipcode)) missing.push('valid ZIP');
+    return missing;
+  }
+
+  private healthMissingFields(): string[] {
+    const missing: string[] = [];
+    if (!this.health.diabetes) missing.push('diabetes type');
+    if (this.healthRequiresInsulin && !this.health.insulin) missing.push('insulin use');
+    return missing;
   }
 
   private fetchAddressSuggestions(search: string): void {
