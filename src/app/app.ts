@@ -221,6 +221,7 @@ export class App implements OnInit {
 
   addressSuggestions: SmartySuggestion[] = [];
   activeAddressSuggestionIndex = -1;
+  addressAutocompleteStatus = '';
   private addressSuggestionTimer?: number;
   selectedSmartyAddress: AddressSnapshot | null = null;
   smartyAddressAltered = false;
@@ -482,6 +483,16 @@ export class App implements OnInit {
       });
     }
     this.trackVisibleStepViews();
+  }
+
+  onAddressOneChange(value: string): void {
+    this.shipping.address1 = value;
+    this.onShippingInput('address1');
+  }
+
+  onShippingValueChange(field: keyof AddressSnapshot, value: string): void {
+    this.shipping[field] = value;
+    this.onShippingInput(field);
   }
 
   onHealthChange(fieldName: 'diabetes' | 'insulin', value: string): void {
@@ -886,29 +897,33 @@ export class App implements OnInit {
   private fetchAddressSuggestions(search: string): void {
     const smartyEmbeddedKey = this.getMetaContent('qms-smarty-embedded-key') || window.QMS_SMARTY_EMBEDDED_KEY || '';
     if (!smartyEmbeddedKey || search.length < 3) {
+      this.addressAutocompleteStatus = smartyEmbeddedKey ? '' : 'Address suggestions are not configured.';
       this.hideAddressSuggestions();
       return;
     }
+    this.addressAutocompleteStatus = '';
 
     const params = new URLSearchParams({
       key: smartyEmbeddedKey,
       search,
       max_results: '8',
       source: 'postal',
-      exclude: 'po-box,military',
       prefer_geolocation: 'city',
     });
 
-    fetch(`https://us-autocomplete.api.smarty.com/v2/lookup?${params.toString()}`)
+    fetch(`https://us-autocomplete-pro.api.smarty.com/lookup?${params.toString()}`)
       .then((response) => {
         if (!response.ok) {
-          throw new Error(`Smarty request failed: ${response.status}`);
+          return response.text().then((body) => {
+            throw new Error(`Smarty request failed: ${response.status} ${body}`);
+          });
         }
         return response.json();
       })
       .then((data) => {
         this.addressSuggestions = data.suggestions || [];
         this.activeAddressSuggestionIndex = -1;
+        this.addressAutocompleteStatus = this.addressSuggestions.length ? '' : 'No address suggestions found.';
       })
       .catch((error) => {
         console.warn('[QMS address autocomplete] Smarty request failed.', {
@@ -916,6 +931,7 @@ export class App implements OnInit {
           host: window.location.hostname,
           search,
         });
+        this.addressAutocompleteStatus = 'Address suggestions are unavailable. Enter the address manually.';
         this.hideAddressSuggestions();
       });
   }

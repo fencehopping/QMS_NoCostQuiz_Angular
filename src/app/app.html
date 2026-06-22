@@ -355,11 +355,12 @@
                 [disabled]="!shippingUnlocked"
                 [attr.disabled]="!shippingUnlocked ? '' : null"
                 [attr.aria-invalid]="errors['address1'] ? 'true' : null"
-                [(ngModel)]="shipping.address1"
-                (input)="onShippingInput('address1')"
+                [ngModel]="shipping.address1"
+                (ngModelChange)="onAddressOneChange($event)"
                 (keydown)="handleAddressKeydown($event)"
               />
               <div class="field-error" *ngIf="errors['address1']">{{ errors['address1'] }}</div>
+              <div class="field-help" *ngIf="addressAutocompleteStatus">{{ addressAutocompleteStatus }}</div>
               <div class="address-suggestions" id="addressSuggestions" role="listbox" *ngIf="addressSuggestions.length">
                 <button
                   type="button"
@@ -387,8 +388,8 @@
                 autocomplete="address-line2"
                 [disabled]="!shippingUnlocked"
                 [attr.disabled]="!shippingUnlocked ? '' : null"
-                [(ngModel)]="shipping.address2"
-                (input)="onShippingInput('address2')"
+                [ngModel]="shipping.address2"
+                (ngModelChange)="onShippingValueChange('address2', $event)"
               />
             </label>
           </div>
@@ -406,8 +407,8 @@
                 [disabled]="!shippingUnlocked"
                 [attr.disabled]="!shippingUnlocked ? '' : null"
                 [attr.aria-invalid]="errors['city'] ? 'true' : null"
-                [(ngModel)]="shipping.city"
-                (input)="onShippingInput('city')"
+                [ngModel]="shipping.city"
+                (ngModelChange)="onShippingValueChange('city', $event)"
               />
               <span class="field-error" *ngIf="errors['city']">{{ errors['city'] }}</span>
             </label>
@@ -424,8 +425,8 @@
                 [disabled]="!shippingUnlocked"
                 [attr.disabled]="!shippingUnlocked ? '' : null"
                 [attr.aria-invalid]="errors['state'] ? 'true' : null"
-                [(ngModel)]="shipping.state"
-                (ngModelChange)="onShippingInput('state')"
+                [ngModel]="shipping.state"
+                (ngModelChange)="onShippingValueChange('state', $event)"
               >
                 <option value="">Select State</option>
                 <option *ngFor="let state of stateOptions" [value]="state.code">
@@ -452,8 +453,8 @@
                 [disabled]="!shippingUnlocked"
                 [attr.disabled]="!shippingUnlocked ? '' : null"
                 [attr.aria-invalid]="errors['zipcode'] ? 'true' : null"
-                [(ngModel)]="shipping.zipcode"
-                (input)="onShippingInput('zipcode')"
+                [ngModel]="shipping.zipcode"
+                (ngModelChange)="onShippingValueChange('zipcode', $event)"
               />
               <span class="field-error" *ngIf="errors['zipcode']">{{ errors['zipcode'] }}</span>
             </label>
