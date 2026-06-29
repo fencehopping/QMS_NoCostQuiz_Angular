@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { captureQmsAttribution, getQmsApplicationId } from './qms-dashboard-beacon';
 
 type ProductId =
   | 'freestyle_libre_3_plus'
@@ -53,7 +54,6 @@ interface StateOption {
 
 declare global {
   interface Window {
-    dataLayer?: Record<string, unknown>[];
     QMS_SMARTY_EMBEDDED_KEY?: string;
     crypto: Crypto;
   }
@@ -232,8 +232,8 @@ export class App implements OnInit {
   private attribution: Record<string, string> = {};
 
   ngOnInit(): void {
-    this.applicationId = this.getApplicationId();
-    this.attribution = this.captureAttribution();
+    this.applicationId = getQmsApplicationId();
+    this.attribution = captureQmsAttribution();
     this.loadReviews();
     this.trackEvent('landing_view', {
       step_id: 'landing',
@@ -1074,16 +1074,15 @@ export class App implements OnInit {
     const payload = {
       event: 'qms_application_event',
       event_type: eventType,
-      application_id: this.applicationId || this.getApplicationId(),
-      attribution: this.captureAttribution(),
+      application_id: this.applicationId || getQmsApplicationId(),
+      attribution: captureQmsAttribution(),
       page_path: window.location.pathname || '/',
       timestamp: new Date().toISOString(),
       ...this.sanitizeDetails(details),
     };
 
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push(payload);
-    this.sendToIngest(payload);
+    const dataLayer = (window.dataLayer = window.dataLayer || []);
+    dataLayer.push(payload);
     return payload;
   }
 
@@ -1096,6 +1095,11 @@ export class App implements OnInit {
       'phone',
       'address1',
       'address2',
+      'insuranceNumber',
+      'medicareNumber',
+      'physicianEmail',
+      'physicianName',
+      'physicianPhone',
       'city',
       'state',
       'zipcode',
@@ -1107,90 +1111,6 @@ export class App implements OnInit {
         ([key, value]) => !blockedKeys.has(key) && value !== undefined && value !== null && value !== '',
       ),
     );
-  }
-
-  private sendToIngest(payload: Record<string, unknown>): void {
-    const url = this.getMetaContent('qms-ingest-url');
-    if (!url) {
-      return;
-    }
-    const body = JSON.stringify({
-      k: this.getMetaContent('qms-ingest-key'),
-      ...payload,
-    });
-    if (navigator.sendBeacon) {
-      navigator.sendBeacon(url, body);
-      return;
-    }
-    fetch(url, { method: 'POST', body, keepalive: true }).catch(() => undefined);
-  }
-
-  private getApplicationId(): string {
-    const stored = this.getStoredValue('qms_application_id');
-    if (stored) {
-      return stored;
-    }
-    const applicationId =
-      window.crypto && typeof window.crypto.randomUUID === 'function'
-        ? window.crypto.randomUUID()
-        : `qms_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-    this.setStoredValue('qms_application_id', applicationId);
-    return applicationId;
-  }
-
-  private captureAttribution(): Record<string, string> {
-    const params = new URLSearchParams(window.location.search);
-    const attribution = this.readStoredAttribution();
-    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'gclid', 'fbclid', 'msclkid'].forEach(
-      (key) => {
-        const value = params.get(key);
-        if (value) {
-          attribution[key] = value;
-        }
-      },
-    );
-    if (!attribution['landing_page']) {
-      attribution['landing_page'] = window.location.pathname || '/';
-    }
-    if (!attribution['referrer'] && document.referrer) {
-      attribution['referrer'] = this.sanitizeUrl(document.referrer);
-    }
-    this.setStoredValue('qms_attribution', JSON.stringify(attribution));
-    return attribution;
-  }
-
-  private readStoredAttribution(): Record<string, string> {
-    try {
-      return JSON.parse(this.getStoredValue('qms_attribution') || '{}') || {};
-    } catch {
-      return {};
-    }
-  }
-
-  private sanitizeUrl(value: string): string {
-    try {
-      const url = new URL(value, window.location.origin);
-      return url.origin + url.pathname;
-    } catch {
-      return '';
-    }
-  }
-
-  private getStoredValue(key: string): string | null {
-    try {
-      return window.localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  }
-
-  private setStoredValue(key: string, value: string): boolean {
-    try {
-      window.localStorage.setItem(key, value);
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   private getMetaContent(name: string): string {
