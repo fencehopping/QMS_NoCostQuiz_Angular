@@ -52,42 +52,6 @@ interface StateOption {
   name: string;
 }
 
-interface InsurancePlan {
-  id: number;
-  name: string;
-  type: string;
-  states: string[];
-}
-
-interface InsuranceProviderOption {
-  name: string;
-  types: string[];
-  states: string[];
-}
-
-interface Physician {
-  firstName: string;
-  lastName: string;
-  npi?: string;
-  address1?: string;
-  city?: string;
-  state?: string;
-  zipcode?: string;
-  phone?: string;
-  fax?: string;
-  manual?: boolean;
-}
-
-interface InsuranceSearchState {
-  [key: string]: string | boolean;
-  primaryQuery: string;
-  primaryState: string;
-  primaryExpanded: boolean;
-  secondaryQuery: string;
-  secondaryState: string;
-  secondaryExpanded: boolean;
-}
-
 declare global {
   interface Window {
     QMS_SMARTY_EMBEDDED_KEY?: string;
@@ -188,55 +152,7 @@ export class App implements OnInit {
   ];
 
   readonly stateCodes = new Set(this.stateOptions.map((option) => option.code));
-  readonly mockPhysicians: Physician[] = [
-    {
-      firstName: 'Sarah',
-      lastName: 'Mitchell',
-      npi: '1234567890',
-      address1: '1200 S Olive Ave',
-      city: 'West Palm Beach',
-      state: 'FL',
-      zipcode: '33401',
-      phone: '(561) 555-0142',
-      fax: '(561) 555-0143',
-    },
-    {
-      firstName: 'James',
-      lastName: 'Anderson',
-      npi: '1987654321',
-      address1: '4500 PGA Blvd',
-      city: 'Palm Beach Gardens',
-      state: 'FL',
-      zipcode: '33418',
-      phone: '(561) 555-0188',
-      fax: '(561) 555-0189',
-    },
-    {
-      firstName: 'Patricia',
-      lastName: 'Gomez',
-      npi: '1546372819',
-      address1: '2820 N Australian Ave',
-      city: 'West Palm Beach',
-      state: 'FL',
-      zipcode: '33407',
-      phone: '(561) 555-0211',
-      fax: '(561) 555-0212',
-    },
-    {
-      firstName: 'Aaron',
-      lastName: 'Anderson',
-      npi: '1780769323',
-      address1: '1950 SW Magazine Rd',
-      city: 'Ankeny',
-      state: 'IA',
-      zipcode: '50023',
-      phone: '(515) 282-2921',
-      fax: '(515) 282-1035',
-    },
-  ];
 
-  intakePhase: 'quiz' | 'insurance' | 'complete' = 'quiz';
-  stepTwoLoading = false;
   selectedProductIds = new Set<ProductId>();
   prescribedCgmBefore = '';
   lymphedema = '';
@@ -263,52 +179,6 @@ export class App implements OnInit {
   health = {
     diabetes: '',
     insulin: '',
-  };
-
-  insurance = {
-    primaryType: '',
-    medicareNumber: '',
-    primaryProvider: '',
-    primaryProviderManual: false,
-    primaryPolicy: '',
-    hasSecondary: '',
-    secondaryProvider: '',
-    secondaryProviderManual: false,
-    secondaryPolicy: '',
-    shipDifferent: 'no',
-    alternateShipping: {
-      address1: '',
-      address2: '',
-      city: '',
-      state: '',
-      zipcode: '',
-    } as AddressSnapshot,
-    physicianMode: 'search',
-    physicianSearch: '',
-    physicianState: '',
-    physicianCity: '',
-    physicianLastName: '',
-    selectedPhysician: null as Physician | null,
-    manualPhysician: {
-      firstName: '',
-      lastName: '',
-      npi: '',
-      address1: '',
-      city: '',
-      state: '',
-      zipcode: '',
-      phone: '',
-      fax: '',
-    },
-  };
-
-  insuranceSearch: InsuranceSearchState = {
-    primaryQuery: '',
-    primaryState: '',
-    primaryExpanded: false,
-    secondaryQuery: '',
-    secondaryState: '',
-    secondaryExpanded: false,
   };
 
   errors: Record<string, string> = {};
@@ -360,13 +230,11 @@ export class App implements OnInit {
 
   private applicationId = '';
   private attribution: Record<string, string> = {};
-  private insurancePlans: InsurancePlan[] = [];
 
   ngOnInit(): void {
     this.applicationId = getQmsApplicationId();
     this.attribution = captureQmsAttribution();
     this.loadReviews();
-    this.loadInsurancePlans();
     this.trackEvent('landing_view', {
       step_id: 'landing',
       flow_name: 'qms_application',
@@ -411,75 +279,6 @@ export class App implements OnInit {
 
   get orderReady(): boolean {
     return this.acknowledgementUnlocked && this.acknowledgement;
-  }
-
-  get insuranceProviders(): InsuranceProviderOption[] {
-    const byName = new Map<string, { types: Set<string>; states: Set<string> }>();
-    this.insurancePlans.forEach((plan) => {
-      const entry = byName.get(plan.name) || { types: new Set<string>(), states: new Set<string>() };
-      entry.types.add(plan.type);
-      plan.states.forEach((state) => entry.states.add(state));
-      byName.set(plan.name, entry);
-    });
-    return Array.from(byName.entries())
-      .map(([name, value]) => ({
-        name,
-        types: Array.from(value.types).sort(),
-        states: Array.from(value.states).sort(),
-      }))
-      .sort((first, second) => first.name.localeCompare(second.name));
-  }
-
-  get insuranceStateOptions(): StateOption[] {
-    const availableStates = new Set(this.insuranceProviders.flatMap((provider) => provider.states));
-    return this.stateOptions.filter((state) => availableStates.has(state.code));
-  }
-
-  get primaryTopProviders(): InsuranceProviderOption[] {
-    return this.topInsuranceProviders(this.insuranceSearch.primaryState || this.shipping.state);
-  }
-
-  get secondaryTopProviders(): InsuranceProviderOption[] {
-    return this.topInsuranceProviders(this.insuranceSearch.secondaryState || this.shipping.state);
-  }
-
-  get primaryProviderResults(): InsuranceProviderOption[] {
-    return this.filterInsuranceProviders(this.insuranceSearch.primaryQuery, this.insuranceSearch.primaryState);
-  }
-
-  get secondaryProviderResults(): InsuranceProviderOption[] {
-    return this.filterInsuranceProviders(this.insuranceSearch.secondaryQuery, this.insuranceSearch.secondaryState);
-  }
-
-  get physicianResults(): Physician[] {
-    const query = this.insurance.physicianSearch.trim().toLowerCase();
-    const lastName = this.insurance.physicianLastName.trim().toLowerCase();
-    const city = this.insurance.physicianCity.trim().toLowerCase();
-    const state = (this.insurance.physicianState || this.shipping.state).trim().toUpperCase();
-
-    if (!query && !lastName && !city) {
-      return [];
-    }
-
-    return this.mockPhysicians
-      .filter((physician) => {
-        const fullName = `${physician.firstName} ${physician.lastName}`.toLowerCase();
-        return (
-          (!state || physician.state === state) &&
-          (!query || fullName.includes(query)) &&
-          (!lastName || physician.lastName.toLowerCase().includes(lastName)) &&
-          (!city || (physician.city || '').toLowerCase().includes(city))
-        );
-      })
-      .slice(0, 8);
-  }
-
-  get insuranceReady(): boolean {
-    return this.isInsuranceValid();
-  }
-
-  get displayedShippingAddress(): string {
-    return this.renderAddressForReview(this.shipping).replace(/\n/g, ', ');
   }
 
   get healthRequiresInsulin(): boolean {
@@ -744,7 +543,7 @@ export class App implements OnInit {
       return;
     }
 
-    this.openInsuranceStep();
+    this.completeStartOrder();
   }
 
   confirmAddress(): void {
@@ -754,177 +553,7 @@ export class App implements OnInit {
       step_id: 'shipping_information',
       modal_id: 'shipping_address_review',
     });
-    this.openInsuranceStep();
-  }
-
-  setPrimaryInsuranceType(value: string): void {
-    this.insurance.primaryType = value;
-    this.setError('primaryType', '');
-    if (value !== 'medicare') {
-      this.insurance.medicareNumber = '';
-      this.setError('medicareNumber', '');
-    }
-    if (value !== 'private') {
-      this.insurance.primaryProvider = '';
-      this.insurance.primaryProviderManual = false;
-      this.insurance.primaryPolicy = '';
-      this.setError('primaryProvider', '');
-      this.setError('primaryPolicy', '');
-    }
-    this.trackEvent('branch_selected', {
-      step_id: 'insurance_primary',
-      branch_name: 'primary_insurance_type',
-      branch_value: value,
-    });
-  }
-
-  selectInsuranceProvider(kind: 'primary' | 'secondary', providerName: string, manual = false): void {
-    if (kind === 'primary') {
-      this.insurance.primaryProvider = providerName;
-      this.insurance.primaryProviderManual = manual;
-      this.setError('primaryProvider', '');
-    } else {
-      this.insurance.secondaryProvider = providerName;
-      this.insurance.secondaryProviderManual = manual;
-      this.setError('secondaryProvider', '');
-    }
-    this.trackEvent('branch_selected', {
-      step_id: kind === 'primary' ? 'insurance_primary' : 'insurance_secondary',
-      branch_name: `${kind}_insurance_provider`,
-      provider_manual: manual,
-    });
-  }
-
-  changeInsuranceProvider(kind: 'primary' | 'secondary'): void {
-    if (kind === 'primary') {
-      this.insurance.primaryProvider = '';
-      this.insurance.primaryProviderManual = false;
-      this.insurance.primaryPolicy = '';
-      this.insuranceSearch.primaryExpanded = true;
-    } else {
-      this.insurance.secondaryProvider = '';
-      this.insurance.secondaryProviderManual = false;
-      this.insurance.secondaryPolicy = '';
-      this.insuranceSearch.secondaryExpanded = true;
-    }
-  }
-
-  onInsuranceInput(field?: keyof typeof this.insurance): void {
-    if (field === 'physicianState') {
-      this.insurance.physicianState = this.insurance.physicianState.toUpperCase();
-    }
-    this.validateInsurance(true);
-  }
-
-  onAlternateShippingInput(field: keyof AddressSnapshot): void {
-    if (field === 'state') {
-      this.insurance.alternateShipping.state = this.insurance.alternateShipping.state.toUpperCase();
-    }
-    this.validateInsurance(true);
-  }
-
-  setSecondaryInsurance(value: string): void {
-    this.insurance.hasSecondary = value;
-    this.setError('hasSecondary', '');
-    if (value !== 'yes') {
-      this.insurance.secondaryProvider = '';
-      this.insurance.secondaryProviderManual = false;
-      this.insurance.secondaryPolicy = '';
-      this.setError('secondaryProvider', '');
-    }
-    this.trackEvent('branch_selected', {
-      step_id: 'insurance_secondary',
-      branch_name: 'has_secondary_insurance',
-      branch_value: value,
-    });
-  }
-
-  setShippingPreference(value: string): void {
-    this.insurance.shipDifferent = value;
-    if (value === 'no') {
-      this.insurance.alternateShipping = {
-        address1: '',
-        address2: '',
-        city: '',
-        state: '',
-        zipcode: '',
-      };
-      ['alternateAddress1', 'alternateCity', 'alternateState', 'alternateZipcode'].forEach((field) =>
-        this.setError(field, ''),
-      );
-    }
-    this.trackEvent('branch_selected', {
-      step_id: 'insurance_shipping',
-      branch_name: 'ship_different_address',
-      branch_value: value,
-    });
-  }
-
-  selectPhysician(physician: Physician): void {
-    this.insurance.selectedPhysician = physician;
-    this.insurance.physicianMode = 'search';
-    this.setError('physician', '');
-    this.trackStepComplete('physician_information', {
-      physician_selected_from_search: !physician.manual,
-    });
-  }
-
-  useManualPhysician(): void {
-    this.insurance.physicianMode = 'manual';
-    this.insurance.selectedPhysician = null;
-    this.setError('physician', '');
-  }
-
-  saveManualPhysician(): void {
-    if (!this.validateManualPhysician(true)) {
-      this.scrollToFirstValidationIssue();
-      return;
-    }
-    const manual = this.insurance.manualPhysician;
-    this.selectPhysician({
-      firstName: manual.firstName,
-      lastName: manual.lastName,
-      npi: manual.npi,
-      address1: manual.address1,
-      city: manual.city,
-      state: manual.state.toUpperCase(),
-      zipcode: manual.zipcode,
-      phone: manual.phone,
-      fax: manual.fax,
-      manual: true,
-    });
-  }
-
-  completeInsuranceOrder(): void {
-    if (!this.validateInsurance(true)) {
-      this.scrollToFirstValidationIssue();
-      return;
-    }
-
-    this.trackStepComplete('insurance_information', {
-      primary_type: this.insurance.primaryType,
-      has_secondary: this.insurance.hasSecondary,
-      ship_different: this.insurance.shipDifferent,
-      physician_manual: Boolean(this.insurance.selectedPhysician?.manual),
-    });
-    this.trackEvent('final_application_complete', {
-      step_id: 'application_complete',
-      completion_action: 'insurance_complete',
-      selected_products: this.selectedProducts,
-      primary_type: this.insurance.primaryType,
-      has_secondary: this.insurance.hasSecondary,
-    });
-    this.intakePhase = 'complete';
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  returnToQuiz(): void {
-    this.intakePhase = 'quiz';
-    window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
-    this.trackEvent('step_back', {
-      from_step_id: 'insurance_primary',
-      to_step_id: 'quiz',
-    });
+    this.completeStartOrder();
   }
 
   showBlockingStepErrors(): boolean {
@@ -1041,11 +670,6 @@ export class App implements OnInit {
   stars(count: number | undefined): number[] {
     const activeCount = Math.max(0, Math.min(5, Math.floor(Number(count) || 0)));
     return Array.from({ length: 5 }, (_, index) => (index < activeCount ? 1 : 0));
-  }
-
-  insuranceSearchText(key: string): string {
-    const value = this.insuranceSearch[key];
-    return typeof value === 'string' ? value : '';
   }
 
   private clearValidationState(): void {
@@ -1359,181 +983,6 @@ export class App implements OnInit {
       completion_action: 'start_order',
       selected_products: this.selectedProducts,
     });
-  }
-
-  private openInsuranceStep(): void {
-    this.stepTwoLoading = true;
-    this.insuranceSearch.primaryState = this.shipping.state;
-    this.insuranceSearch.secondaryState = this.shipping.state;
-    this.insurance.physicianState = this.shipping.state || 'FL';
-    this.trackEvent('portal_entered', {
-      step_id: 'insurance_entry',
-      entry_action: 'start_order',
-    });
-    this.trackStepView('insurance_primary', 1);
-    window.setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'auto' });
-      this.intakePhase = 'insurance';
-      this.stepTwoLoading = false;
-    }, 700);
-  }
-
-  private loadInsurancePlans(): void {
-    fetch('assets/data/insurance_plans.json')
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error('Insurance plans unavailable');
-        }
-        return response.json();
-      })
-      .then((plans: InsurancePlan[]) => {
-        this.insurancePlans = Array.isArray(plans) ? plans : [];
-      })
-      .catch((error) => {
-        console.warn('[QMS insurance intake] Plan list failed to load.', error);
-        this.insurancePlans = [];
-      });
-  }
-
-  private topInsuranceProviders(stateCode: string): InsuranceProviderOption[] {
-    const normalizedState = stateCode.trim().toUpperCase();
-    const inState = this.insuranceProviders
-      .filter((provider) => provider.states.includes(normalizedState))
-      .sort((first, second) => second.states.length - first.states.length);
-    const national = [...this.insuranceProviders].sort(
-      (first, second) => second.states.length - first.states.length,
-    );
-    const names = new Set<string>();
-    return [...inState, ...national].filter((provider) => {
-      if (names.has(provider.name) || names.size >= 10) {
-        return false;
-      }
-      names.add(provider.name);
-      return true;
-    });
-  }
-
-  private filterInsuranceProviders(query: string, stateCode: string): InsuranceProviderOption[] {
-    const normalizedQuery = query.trim().toLowerCase();
-    const normalizedState = stateCode.trim().toUpperCase();
-    return this.insuranceProviders
-      .filter(
-        (provider) =>
-          (!normalizedState || provider.states.includes(normalizedState)) &&
-          (!normalizedQuery || provider.name.toLowerCase().includes(normalizedQuery)),
-      )
-      .slice(0, 80);
-  }
-
-  private isInsuranceValid(): boolean {
-    if (!this.insurance.primaryType) {
-      return false;
-    }
-    if (this.insurance.primaryType === 'medicare' && !this.insurance.medicareNumber.trim()) {
-      return false;
-    }
-    if (
-      this.insurance.primaryType === 'private' &&
-      (!this.insurance.primaryProvider.trim() || !this.insurance.primaryPolicy.trim())
-    ) {
-      return false;
-    }
-    if (!this.insurance.hasSecondary) {
-      return false;
-    }
-    if (this.insurance.hasSecondary === 'yes' && !this.insurance.secondaryProvider.trim()) {
-      return false;
-    }
-    if (this.insurance.shipDifferent === 'yes' && !this.isAlternateShippingValid()) {
-      return false;
-    }
-    return Boolean(this.insurance.selectedPhysician);
-  }
-
-  private validateInsurance(showErrors = false): boolean {
-    if (!showErrors) {
-      return this.isInsuranceValid();
-    }
-    this.setError('primaryType', this.insurance.primaryType ? '' : 'Choose a primary insurance type.');
-    this.setError(
-      'medicareNumber',
-      this.insurance.primaryType !== 'medicare' || this.insurance.medicareNumber.trim()
-        ? ''
-        : 'Medicare number is required.',
-    );
-    this.setError(
-      'primaryProvider',
-      this.insurance.primaryType !== 'private' || this.insurance.primaryProvider.trim()
-        ? ''
-        : 'Choose your insurance provider.',
-    );
-    this.setError(
-      'primaryPolicy',
-      this.insurance.primaryType !== 'private' || this.insurance.primaryPolicy.trim()
-        ? ''
-        : 'Policy number is required.',
-    );
-    this.setError('hasSecondary', this.insurance.hasSecondary ? '' : 'Choose whether you have secondary insurance.');
-    this.setError(
-      'secondaryProvider',
-      this.insurance.hasSecondary !== 'yes' || this.insurance.secondaryProvider.trim()
-        ? ''
-        : 'Choose your secondary insurance provider.',
-    );
-    this.validateAlternateShipping(showErrors);
-    this.setError('physician', this.insurance.selectedPhysician ? '' : 'Select or add your physician.');
-    return this.isInsuranceValid();
-  }
-
-  private isAlternateShippingValid(): boolean {
-    const address = this.insurance.alternateShipping;
-    return Boolean(
-      address.address1.trim() &&
-        address.city.trim() &&
-        this.isValidState(address.state) &&
-        this.isValidZip(address.zipcode),
-    );
-  }
-
-  private validateAlternateShipping(showErrors = false): boolean {
-    if (this.insurance.shipDifferent !== 'yes') {
-      return true;
-    }
-    if (showErrors) {
-      const address = this.insurance.alternateShipping;
-      this.setError('alternateAddress1', address.address1.trim() ? '' : 'Address 1 is required.');
-      this.setError('alternateCity', address.city.trim() ? '' : 'City is required.');
-      this.setError(
-        'alternateState',
-        !address.state.trim()
-          ? 'State is required.'
-          : this.isValidState(address.state)
-            ? ''
-            : 'Select a valid state.',
-      );
-      this.setError(
-        'alternateZipcode',
-        !address.zipcode.trim()
-          ? 'ZIP code is required.'
-          : this.isValidZip(address.zipcode)
-            ? ''
-            : 'Enter a valid ZIP code.',
-      );
-    }
-    return this.isAlternateShippingValid();
-  }
-
-  private validateManualPhysician(showErrors = false): boolean {
-    const physician = this.insurance.manualPhysician;
-    const valid = Boolean(
-      physician.firstName.trim() && physician.lastName.trim() && physician.phone.trim(),
-    );
-    if (showErrors) {
-      this.setError('manualPhysicianFirstName', physician.firstName.trim() ? '' : 'First name is required.');
-      this.setError('manualPhysicianLastName', physician.lastName.trim() ? '' : 'Last name is required.');
-      this.setError('manualPhysicianPhone', physician.phone.trim() ? '' : 'Phone number is required.');
-    }
-    return valid;
   }
 
   private loadReviews(): void {
